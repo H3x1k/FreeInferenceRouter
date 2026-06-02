@@ -19,13 +19,33 @@ class LocalClient(BaseLLMClient):
     def generate(self, messages, **kwargs):
         for attempt in range(MAX_RETRY):
             try:
+                options = kwargs.pop("options", {"temperature": 0.1})
                 response = self.client.chat(
                     model=MODEL,
                     messages=messages,
                     stream=False,
-                    options={"temperature": 0.1},
+                    options=options,
+                    **kwargs,
                 )
-                return response.message.content
+                msg = response.message
+                tool_calls = None
+                if hasattr(msg, "tool_calls") and msg.tool_calls:
+                    tool_calls = [
+                        {
+                            "id": tc.id,
+                            "type": "function",
+                            "function": {
+                                "name": tc.function.name,
+                                "arguments": tc.function.arguments,
+                            },
+                        }
+                        for tc in msg.tool_calls
+                    ]
+                return {
+                    "role": "assistant",
+                    "content": msg.content,
+                    "tool_calls": tool_calls,
+                }
             except Exception as e:
                 print(f"Ollama failed to generate: {e}")
                 break

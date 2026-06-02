@@ -5,20 +5,25 @@ from datetime import datetime, timedelta
 
 MAX_RETRY = 2
 
+
 class GroqClient(BaseLLMClient):
     def __init__(self, api_key):
         self.client = Groq(api_key=api_key)
         self.rateLimited = False
         self.retryAt = None
-    
+
     def generate(self, messages, **kwargs):
         for attempt in range(MAX_RETRY):
             try:
                 response = self.client.chat.completions.create(
-                    model="openai/gpt-oss-20b",
-                    messages=messages
+                    model="openai/gpt-oss-20b", messages=messages, **kwargs
                 )
-                return response.choices[0].message.content
+                msg = response.choices[0].message
+                return {
+                    "role": "assistant",
+                    "content": msg.content,
+                    "tool_calls": msg.tool_calls,
+                }
             except RateLimitError as e:
                 print("Groq rate limited")
                 self.rateLimited = True
@@ -26,8 +31,8 @@ class GroqClient(BaseLLMClient):
                 return False
             except APIError as e:
                 print(f"Groq API Error {e.status_code}: {e.message}")
-                return False 
+                return False
         return False
-        
+
     def close(self):
         self.client.close()
