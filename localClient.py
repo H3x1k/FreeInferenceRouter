@@ -1,19 +1,21 @@
 from base import BaseLLMClient
-from ollama import Client
-
 from datetime import datetime, timedelta
 
 MAX_RETRY = 2
 MODEL = "qwen3:8b"
 
+
 class LocalClient(BaseLLMClient):
     def __init__(self):
         try:
+            from ollama import Client
+
             self.client = Client(host="http://127.0.0.1:11434")
             self.rateLimited = False
         except Exception as e:
             print(f"Local client failed to initialize: {e}")
-    
+            raise
+
     def generate(self, messages, **kwargs):
         for attempt in range(MAX_RETRY):
             try:
@@ -21,7 +23,7 @@ class LocalClient(BaseLLMClient):
                     model=MODEL,
                     messages=messages,
                     stream=False,
-                    options={"temperature": 0.1}
+                    options={"temperature": 0.1},
                 )
                 return response.message.content
             except Exception as e:
@@ -29,6 +31,6 @@ class LocalClient(BaseLLMClient):
                 break
         self.rateLimited = True
         return False
-        
+
     def close(self):
         self.client.close()
